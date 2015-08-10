@@ -1,28 +1,24 @@
+CXX=g++
+CC=gcc
+CXXFLAGS= -std=c++1y -Werror -pedantic -Wall -Wextra -Wmissing-include-dirs -Wsuggest-final-types -Wsuggest-final-methods -Wsuggest-override -Wfloat-equal -Wshadow -Wcast-qual -Wcast-align -Wconversion -Wzero-as-null-pointer-constant -Wuseless-cast -Wsign-conversion -Wsized-deallocation -Wlogical-op -Wno-aggressive-loop-optimizations -Wredundant-decls -Winline -Winvalid-pch -Wdisabled-optimization 
+CPPFLAGS= -I /home/vincent/coding  -I /home/vincent/coding/web_server_posixpp
 all: libsocxx.a
 
-libsocxx.a: Socket.o ip.o File.o
-	ar cru libsocxx.a Socket.o ip.o File.o
+libsocxx.a: socket.o ip.o file.o socket.hpp.gch
+	ar cru libsocxx.a socket.o ip.o file.o
 	ranlib libsocxx.a
 
-Socket.o: Socket.cpp Socket.hpp.gch
-	g++ Socket.cpp -o Socket.o -std=c++1y -Wall -Werror -Weffc++ --pedantic -c -g
-ip.o: ip.cpp Socket.hpp.gch
-	g++ ip.cpp -o ip.o -std=c++1y -Wall -Werror -Weffc++ --pedantic -c -g
+file.o: file.cpp file.hpp.gch
 
-Socket.hpp.gch: Socket.hpp
-	g++ Socket.hpp -O3 -std=c++1y -Wall -Werror -Weffc++ --pedantic -g
+file.hpp.gch: file.hpp
 
-
-File.o: File.cpp File.hpp.gch
-	g++ File.cpp -O3 -c -std=c++1y -Wall -Werror -Weffc++ --pedantic -g 
-
-File.hpp.gch: File.hpp
-	g++ File.hpp -O3 -c -std=c++1y -Wall -Werror -Weffc++ --pedantic -g
-
+socket.hpp.gch: socket.hpp
+	$(CXX) socket.hpp $(CXXFLAGS)
+file.hpp.gch: file.hpp
+	$(CXX) file.hpp $(CXXFLAGS)
 .PHONY: clean
 
 clean:
 	rm *.o -f
 	rm *.a -f
 	rm *.gch -f
-
