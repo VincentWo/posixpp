@@ -29,6 +29,12 @@ public:
 
     const sockaddr_in& get_raw_struct() const {return address;}
     sockaddr_in& get_raw_struct()             {return address;}
+
+    struct invalid_address : std::exception
+    {
+        virtual const char*
+        what() const noexcept override { return "The string is invalid.";};
+    };
 private:
     sockaddr_in address;
 };
@@ -36,7 +42,7 @@ private:
 class Socket;
 typedef std::pair<Socket, Ipv4> Connection;
 
-class Socket
+class Socket : File
 {
 public:
     Socket(Domain domain, Type type, Protocol protocol = Protocol{})
@@ -44,25 +50,13 @@ public:
                    static_cast<int>(type),
                    static_cast<int>(protocol)} {}
     Socket(int domain, int type, int protocol = 0);
-    explicit Socket(int fd) noexcept : file_desc(fd) {}
+    explicit Socket(int file_descriptor) noexcept : File{file_descriptor} {}
 
     void bind(const sockaddr_in& address);
     void bind(const Ipv4&);
 
     void listen(int times_to_try);
     Connection  accept();
-
-    std::string read();
-
-    size_t write(const std::string& str)
-    {
-        return write(&str[0], str.size());
-    }
-    size_t write(const char* str)
-    {
-        return write(str, std::strlen(str));
-    }
-    size_t write(const void*, size_t);
 
     size_t send(const std::string& msg, int flags = 0)
     {
@@ -90,17 +84,15 @@ public:
     const Socket& operator=(const Socket&);
     const Socket& operator=(Socket&&);
     Socket(const Socket&);
-    Socket(Socket&& mv_from) : file_desc(mv_from.file_desc)
+    Socket(Socket&& mv_from) : File (mv_from.fd)
     {
-        mv_from.file_desc = -1;
+        mv_from.fd = -1;
     }
     ~Socket() noexcept
     {
-        ::shutdown(file_desc, SHUT_RDWR);
-        ::close(file_desc);
+        ::shutdown(fd, SHUT_RDWR);
+        ::close(fd);
     }
-private:
-    int file_desc;
 };
 
 std::ostream& operator<<(std::ostream&, const Ipv4&);

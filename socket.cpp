@@ -5,30 +5,75 @@
 #include "error.hpp"
 
 Socket::Socket(int domain, int type, int protocol)
-              : file_desc{socket(domain, type, protocol)}
+              : File{socket(domain, type, protocol)}
 {
-    if(file_desc < 0)
+    if(fd < 0)
     {
-         throw socket_error{"ERROR opening socket", errno};
+        switch(errno)
+        {
+            case EAFNOSUPPORT:    throw af_not_implemented{};
+            case EPROTONOSUPPORT: throw proto_not_supported{};
+
+            case EPROTOTYPE:      throw sock_not_supported{};
+
+            case EMFILE:          throw insufficient_fd_system{};
+            case ENFILE:          throw insufficient_fd_process{};
+
+            case EACCES:          throw access_denied{};
+
+            case ENOMEM:          throw insufficient_memory{};
+            case ENOBUFS:         throw insufficient_resources{};
+        }
     }
 }
 
 void Socket::bind(const Ipv4& address)
 {
-    if(::bind(file_desc,
+    if(::bind(fd,
                  (const sockaddr *) &address.get_raw_struct(),
                  sizeof(address))
        < 0)
     {
-        throw socket_error{"ERROR on binding", errno};
+        switch(errno)
+        {
+            case EADDRINUSE:   throw addr_in_use{};
+            case EADDRNOTAVAIL:throw addr_not_available{};
+            case EAFNOSUPPORT: throw invalid_addr{};
+            case EALREADY:     throw already_in_progress{};
+            case EBADF:        throw invalid_fd{};
+            case EINPROGRESS:  throw in_progress{};
+            case EINVAL:       throw invalid_socket{};
+            case ENOBUFS:      throw insufficient_resources{};
+            case ENOTSOCK:     throw no_socket{};
+            case EOPNOTSUPP:   throw bind_not_supported{};
+            case EACCES:       throw access_denied{};
+            case EDESTADDRREQ:
+            case EISDIR:       throw invalid_argument{};
+            case EIO:          throw io_error{};
+            case ELOOP:        throw sym_loop{};
+            case ENAMETOOLONG: throw name_too_long{};
+            case ENOENT:       throw not_found{};
+            case ENOTDIR:      throw not_dir{};
+            case EROFS:        throw read_only_fs{};
+            case EISCONN:      throw already_connected{};
+        }
     }
 }
 
 void Socket::listen(int times_to_try)
 {
-    if(::listen(file_desc, times_to_try) < 0)
+    if(::listen(fd, times_to_try) < 0)
     {
-        throw socket_error{"ERROR on listening", errno};
+        switch(errno)
+        {
+            case EBADF:        throw invalid_fd{};
+            case EDESTADDRREQ: throw unbound_socket{};
+            case EINVAL:       throw already_connected{};
+            case ENOTSOCK:     throw no_socket{};
+            case EOPNOTSUPP:   throw listen_not_supported{};
+            case EACCES:       throw access_denied{};
+            case ENOBUFS:      throw insufficient_buffer{};
+        }
     }
 }
 
@@ -37,43 +82,48 @@ std::pair<Socket, Ipv4> Socket::accept()
     sockaddr_in cli_addr;
     socklen_t clilen = sizeof(cli_addr);
 
-    int new_file_desc = ::accept(file_desc,
+    int new_fd = ::accept(fd,
                                  (sockaddr *)&cli_addr,
                                  &clilen);
 
-    if(new_file_desc < 0)
+    if(new_fd < 0)
     {
-        throw socket_error{"ERROR on accept", errno};
+        switch(errno)
+        {
+#if EAGAIN != EWOULDBLOCK
+            case EAGAIN:
+#endif
+            case EWOULDBLOCK: throw would_block{};
+            case EBADF:       throw invalid_fd{};
+            case ECONNABORTED:throw conn_aborted{};
+            case EINTR:       throw signal_caught{};
+            case EINVAL:      throw no_accept{};
+            case EMFILE:      throw insufficient_fd_process{};
+            case ENFILE:      throw insufficient_fd_system{};
+            case ENOBUFS:     throw insufficient_buffer{};
+            case ENOMEM:      throw insufficient_memory{};
+            case ENOTSOCK:    throw no_socket{};
+            case EOPNOTSUPP:  throw accept_not_supported{};
+            case EPROTO:      throw protocol_error{};
+        }
     }
-    return std::make_pair(Socket{new_file_desc}, Ipv4{cli_addr});
-}
-
-std::string Socket::read()
-{
-    char buffer[256]{};
-    auto n = ::read(file_desc, buffer, 255);
-
-    if(n < 0)
-    {
-        throw socket_error{"ERROR on read", errno};
-    }
-    else if(!n)
-    {
-        //TODO: Find out what this means
-        assert("This should never happen");
-        std::terminate();
-    }
-    buffer[n] = '\0';
-
-    return std::string{buffer};
+    return std::make_pair(Socket{new_fd}, Ipv4{cli_addr});
 }
 
 void Socket::setsockopt(int level, int optname)
 {
     int _true = 1;
-    if(::setsockopt(file_desc, level, optname, &_true, sizeof(_true)) == -1)
+    if(::setsockopt(fd, level, optname, &_true, sizeof(_true)) == -1)
     {
-        throw socket_error("ERORR on setsockopt", errno);
+        switch(errno)
+        {
+            case EBADF:       throw invalid_fd{};
+            case EDOM:        throw value_too_big{};
+            case EINVAL:      throw invalid_option{};
+            case EISCONN:     throw is_connected{};
+            case ENOPROTOOPT: throw opt_not_supported{};
+            case ENOTSOCK:    throw no_socket{};
+        }
     }
 }
 
@@ -103,54 +153,114 @@ std::string Socket::receive_line(const std::string& eol)
     }
 }
 
-size_t Socket::write(const void* buf, size_t count)
-{
-    ssize_t bytes_written = ::write(file_desc, buf, count);
-    if(bytes_written == -1)
-    {
-        throw socket_error{"Error on write", errno};
-    }
-    return (size_t) bytes_written;
-}
-
 void Socket::shutdown(int how)
 {
-    if(::shutdown(file_desc, how) == -1)
+    if(::shutdown(fd, how) == -1)
     {
-        throw socket_error{"Error on shutdown", errno};
+        switch(errno)
+        {
+            case EBADF:    throw invalid_fd{};
+            case EINVAL:   throw invalid_argument{};
+            case ENOTCONN: throw not_connected{};
+            case ENOTSOCK: throw no_socket{};
+        }
     }
 }
 
 size_t Socket::receive(void* buffer, size_t buf_size, int flags)
 {
-    ssize_t size = ::recv(file_desc, buffer, buf_size, flags);
+    ssize_t size = ::recv(fd, buffer, buf_size, flags);
     if(size == 0)
     {
-        throw socket_error{"Connection closed", 0};
+        throw already_shutdowned{};
     }
     if(size == -1)
     {
-        throw socket_error{"Error on receive", errno};
+        switch(errno)
+        {
+#if EAGAIN != EWOULDBLOCK
+            case EAGAIN:
+#endif
+            case EWOULDBLOCK: throw would_block{};
+            case EBADF:       throw invalid_fd{};
+            case ECONNRESET:  throw conn_closed{};
+            case EINTR:       throw signal_caught{};
+            case EINVAL:      throw no_oob_data{};
+            case ENOTCONN:    throw not_connected{};
+            case ENOTSOCK:    throw no_socket{};
+            case EOPNOTSUPP:  throw invalid_flag{};
+            case ETIMEDOUT:   throw timeout{};
+            case EIO:         throw io_error{};
+            case ENOBUFS:     throw insufficient_buffer{};
+            case ENOMEM:      throw insufficient_memory{};
+        }
     }
     return (size_t) size;
 }
 
 void Socket::connect(Ipv4 address)
 {
-    if(::connect(file_desc,
+    if(::connect(fd,
                  (const sockaddr*) &address.get_raw_struct(),
                  sizeof(sockaddr_in)) == -1)
     {
-        throw socket_error{"Error on connect", errno};
+        switch(errno)
+        {
+            case EADDRNOTAVAIL: throw addr_not_available{};
+            case EAFNOSUPPORT:  throw invalid_addr{};
+            case EALREADY:      throw already_in_progress{};
+            case EBADF:         throw invalid_fd{};
+            case ECONNREFUSED:  throw conn_refused{};
+            case EINPROGRESS:   throw in_progress{};
+            case EINTR:         throw signal_caught{};
+            case EISCONN:       throw already_connected{};
+            case ENETUNREACH:   throw no_network{};
+            case ENOTSOCK:      throw no_socket{};
+            case EPROTOTYPE:    throw wrong_addr_type{};
+            case ETIMEDOUT:     throw timeout{};
+            case EIO:           throw io_error{};
+            case ELOOP:         throw sym_loop{};
+            case ENAMETOOLONG:  throw name_too_long{};
+            case ENOENT:        throw not_found{};
+            case ENOTDIR:       throw not_dir{};
+            case EACCES:        throw access_denied{};
+            case EADDRINUSE:    throw addr_in_use{};
+            case ECONNRESET:    throw conn_closed{};
+            case EHOSTUNREACH:  throw host_unreachable{};
+            case EINVAL:        throw invalid_addr_length{};
+            case ENETDOWN:      throw net_down{};
+            case ENOBUFS:       throw insufficient_buffer{};
+            case EOPNOTSUPP:    throw is_listening{};
+        }
     }
 }
 
 size_t Socket::send(const void* buf, size_t len, int flags)
 {
-    ssize_t send_bytes = ::send(file_desc, buf, len, flags);
+    ssize_t send_bytes = ::send(fd, buf, len, flags);
     if(send_bytes == -1)
     {
-        throw socket_error{"send", errno};
+        switch(errno)
+        {
+#if EAGAIN != EWOULDBLOCK
+            case EAGAIN:
+#endif
+            case EWOULDBLOCK:  throw would_block{};
+            case EBADF:        throw invalid_fd{};
+            case ECONNRESET:   throw conn_closed{};
+            case EDESTADDRREQ: throw no_addr{};
+            case EINTR:        throw signal_caught{};
+            case EMSGSIZE:     throw msg_too_large{};
+            case ENOTCONN:     throw not_connected{};
+            case ENOTSOCK:     throw no_socket{};
+            case EOPNOTSUPP:   throw invalid_flag{};
+            case EPIPE:        throw invalid_socket{};
+            case EACCES:       throw access_denied{};
+            case EIO:          throw io_error{};
+            case ENETDOWN:     throw net_down{};
+            case ENETUNREACH:  throw no_network{};
+            case ENOBUFS:      throw insufficient_buffer{};
+        }
     }
     return (size_t) send_bytes;
 }

@@ -14,7 +14,7 @@ class File
         explicit File(const std::string& path, flag flags)
             : File(path.c_str(), flags) {}
         explicit File(const char* path, flag flags);
-        explicit File(int file_descriptor);
+        explicit File(int file_descriptor) : fd{file_descriptor} {}
 
         File(const File& f);
         File(File&&);
@@ -106,7 +106,7 @@ class File
 #endif
         };
 
-    private:
+    protected:
         int fd; 
 };
 #endif /* SOCXX_FILE_HPP_INCLUDE */

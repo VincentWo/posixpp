@@ -11,7 +11,7 @@ Ipv4::Ipv4(std::string ip, uint16_t port)
 {
     if(!inet_aton(ip.c_str(), &address.sin_addr))
     {
-        throw socket_error{"ERROR: " + ip + " is not a valid ip address", 0};
+        throw invalid_address{};
     }
 }
 

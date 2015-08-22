@@ -22,7 +22,7 @@ File::File(const char* path, flag flags) : fd(::open(path, flags))
 	{
 		switch(errno)
 		{
-			case EACCES:  throw permission_denied{};
+			case EACCES:  throw access_denied{};
 			case EEXIST:  throw file_exists{};
 			case EINTR:   throw signal_caught{};
 			case EINVAL:  throw invalid_flag{};
@@ -48,11 +48,10 @@ read_error_handling(int errnum)
 {
 	switch(errnum)
 	{
-#if EAGAIN == EWOULDBLOCK
-		case EAGAIN: throw would_block{};
-#else
-		case EAGAIN: case EWOULDBLOCK: throw would_block{};
+#if EAGAIN != EWOULDBLOCK
+		case EAGAIN:
 #endif
+		case EWOULDBLOCK: throw would_block{};
 		case EBADF:  throw invalid_fd{};
 		case EFAULT: throw invalid_buffer{};
 		case EINTR:  throw signal_caught{};
