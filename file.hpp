@@ -11,9 +11,9 @@ class File
     public:
         enum flag : int;
 
-        explicit File(const std::string& path, flag flags)
+        explicit File(const std::string& path, flag flags = flag{})
             : File(path.c_str(), flags) {}
-        explicit File(const char* path, flag flags);
+        explicit File(const char* path, flag flags = flag{});
         explicit File(int file_descriptor) : fd{file_descriptor} {}
 
         File(const File& f);

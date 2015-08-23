@@ -11,12 +11,6 @@
 
 #include "utility.hpp"
 #include "file.hpp"
-enum class Domain   : int {
-};
-enum class Type     : int {
-};
-enum class Protocol : int {
-};
 
 class Ipv4
 {
@@ -45,6 +39,19 @@ typedef std::pair<Socket, Ipv4> Connection;
 class Socket : File
 {
 public:
+    enum Domain   : int
+    {
+        ipv4  = AF_INET,
+        ipv6  = AF_INET6,
+        local = AF_LOCAL
+    };
+    enum Type     : int
+    {
+        stream     = SOCK_STREAM,
+        datagram   = SOCK_DGRAM,
+        seq_packet = SOCK_SEQPACKET
+    };
+    enum Protocol : int;
     Socket(Domain domain, Type type, Protocol protocol = Protocol{})
           : Socket{static_cast<int>(domain),
                    static_cast<int>(type),
